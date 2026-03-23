@@ -3,6 +3,7 @@
 #include <curand_kernel.h>
 #include <math.h>
 #include <string.h>
+#define BK 32
 
 #define CUDA_CHECK(call)                                           \
     do                                                             \
@@ -45,19 +46,59 @@ __global__ void FeedforwardReLU(int batch_size, int in_features, int out_feature
 
 }
 
-__global__ void Softmax(int R, int C, float *input, float *output)
-{
-    int row = threadIdx.x + blockDim.x * blockIdx.x;
-    if (row < R)
-    {
-        float max_val = input[row * C];
-        for (int i = 1; i < C; i++)
-            max_val = fmaxf(max_val, input[row * C + i]);
-        float denom = 0.f;
-        for (int i = 0; i < C; i++)
-            denom += expf(input[row * C + i] - max_val);
-        for (int i = 0; i < C; i++)
-            output[row * C + i] = expf(input[row * C + i] - max_val) / denom;
+__global__ void softmax_shared(int R, int C, float *input, float *output) {
+    int ly = threadIdx.x / BK;
+    int lx = threadIdx.x % BK;
+
+    __shared__ float sf[BK * BK];
+    __shared__ float max_val[BK];
+    __shared__ float denom[BK];
+
+    int row_idx = blockIdx.x * BK + ly;
+    if (row_idx >= R) return;                     
+
+    int row_base = row_idx * C;
+
+    if (lx == 0) {
+        max_val[ly] = -3.402823466e+38f;
+        denom[ly]   = 0.f;
+    }
+    __syncthreads();
+
+    int num_tiles = (C + BK - 1) / BK;
+
+    for (int phase = 0; phase < num_tiles; phase++) {
+        int col = phase * BK + lx;
+        if (col < C)
+            sf[ly * BK + lx] = input[row_base + col];
+        else
+            sf[ly * BK + lx] = -3.402823466e+38f;
+
+        __syncthreads();
+
+        if (lx == 0) {
+            float new_max = max_val[ly];
+            int tile_size = min(BK, C - phase * BK);
+
+            for (int i = 0; i < tile_size; i++)
+                new_max = fmaxf(new_max, sf[ly * BK + i]);
+
+            float new_denom = denom[ly] * expf(max_val[ly] - new_max);
+            for (int i = 0; i < tile_size; i++)
+                new_denom += expf(sf[ly * BK + i] - new_max);
+
+            max_val[ly] = new_max;
+            denom[ly]   = new_denom;
+        }
+        __syncthreads();
+    }
+
+    for (int phase = 0; phase < num_tiles; phase++) {
+        int col = phase * BK + lx;
+        if (col < C) {
+            float val = input[row_base + col];
+            output[row_base + col] = expf(val - max_val[ly]) / denom[ly];
+        }
     }
 }
 
@@ -379,7 +420,7 @@ int main()
             FeedforwardReLU<<<G(BATCH, H2), BLK>>>(BATCH, H1, H2, A1, W2, B2, A2);
 
             Feedforward<<<G(BATCH, OUT), BLK>>>(BATCH, H2, OUT, A2, W3, B3, Z3);
-            Softmax<<<(BATCH + 255) / 256, 256>>>(BATCH, OUT, Z3, A3);
+            softmax_shared<<<dim3((BATCH + BK - 1) / BK), BK*BK>>>(BATCH, OUT, Z3, A3);
 
             crossEntropyLoss<<<(BATCH + 255) / 256, 256>>>(BATCH, OUT, A3, Y, loss_vec);
             epoch_loss += mean_loss(loss_vec, BATCH, h_loss_buf);
@@ -427,7 +468,7 @@ int main()
                 FeedforwardReLU<<<G(BATCH, H1), BLK>>>(BATCH, IN, H1, X, W1, B1, A1);
                 FeedforwardReLU<<<G(BATCH, H2), BLK>>>(BATCH, H1, H2, A1, W2, B2, A2);
                 Feedforward<<<G(BATCH, OUT), BLK>>>(BATCH, H2, OUT, A2, W3, B3, Z3);
-                Softmax<<<(BATCH + 255) / 256, 256>>>(BATCH, OUT, Z3, A3);
+                softmax_shared<<<dim3((BATCH + BK - 1) / BK), BK*BK>>>(BATCH, OUT, Z3, A3);
                 CUDA_CHECK(cudaDeviceSynchronize());
 
                 CUDA_CHECK(cudaMemcpy(h_prebuf, A3, BATCH * OUT * sizeof(float), cudaMemcpyDeviceToHost));

@@ -61,3 +61,47 @@ __global__ void softmax_shared(int R, int C, float *input, float temperature, fl
         __syncthreads();
     }
 }
+
+__global__ void softmax_shared_optimal(int R, int C, float *input, float temperature, float *output) {
+    int ly = threadIdx.x / BK;   
+    int lx = threadIdx.x % BK;   
+
+    __shared__ float sf[BK * BK];
+    __shared__ float max_val[BK];
+    __shared__ float denom[BK];
+
+
+    if (lx == 0) {
+        max_val[ly] = -FLT_MAX;
+        denom[ly]   = 0.f;
+    }
+    __syncthreads();
+
+    for (int phase = 0; phase < C / BK; phase++) {
+        sf[ly * BK + lx] = input[(phase * BK + ly) * C + blockIdx.x * BK + lx];
+        __syncthreads();
+
+
+        if (lx == 0) {
+            float new_max = max_val[ly];
+            for (int i = 0; i < BK; i++)
+                new_max = fmaxf(new_max, sf[ly * BK + i]);
+
+            float new_denom = denom[ly] * expf(max_val[ly] - new_max);
+            for (int i = 0; i < BK; i++)
+                new_denom += expf(sf[ly * BK + i] - new_max);
+
+            max_val[ly] = new_max;
+            denom[ly]   = new_denom;
+        }
+        __syncthreads();
+    }
+
+    for (int phase = 0; phase < C / BK; phase++) {
+        sf[ly * BK + lx] = input[(phase * BK + ly) * C + blockIdx.x * BK + lx];
+        __syncthreads();
+        output[(phase * BK + ly) * C + blockIdx.x * BK + lx] =
+            expf(sf[ly * BK + lx] - max_val[ly]) / denom[ly];
+        __syncthreads();
+    }
+}
