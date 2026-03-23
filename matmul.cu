@@ -2,11 +2,12 @@
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
 #define TM 8
-#define BK 8
-#define TN 4
+#define BK 16
+#define TN 8
 #define BM 32
-#define BN 32
+#define BN 64
 #define BLOCK_SIZE 32
+#define BLOCK_SIZE_2D 128
 
 __global__ void matmul(int Rin, int C, int Rout, float *A, float *B, float *Out)
 {
@@ -93,71 +94,114 @@ __global__ void matmul_tiled_1D_coarse(int N, float *A, float *B, float *C)
         C[(blockIdx.x * BM + by * TM + resIdx) * N + blockIdx.y * BN + bx] = threadResults[resIdx];
 }
 
-__global__ void matmul_tiled_2D_coarse_vec(int N, float *A, float *B, float *C)
+
+static __device__ __forceinline__
+float4 safe_ldB(const float * __restrict__ B,
+                int row, int col, int K, int N)
 {
-    
-    uint threadRow = threadIdx.x / (BN/TN); 
-    uint threadCol = threadIdx.x % (BN/TN); 
+    float4 v = {0.f, 0.f, 0.f, 0.f};
+    if (row >= K) return v;
+    const float *p = B + (size_t)row * N + col;
+    if (col + 3 < N) return reinterpret_cast<const float4 *>(p)[0];
+    if (col     < N) v.x = p[0];
+    if (col + 1 < N) v.y = p[1];
+    if (col + 2 < N) v.z = p[2];
+    return v;
+}
+static __device__ __forceinline__
+float4 safe_ldA(const float * __restrict__ A,
+                int row, int col, int M, int K)
+{
+    float4 v = {0.f, 0.f, 0.f, 0.f};
+    if (row >= M) return v;
+    const float *p = A + (size_t)row * K + col;
+    if (col + 3 < K) return reinterpret_cast<const float4 *>(p)[0];
+    if (col     < K) v.x = p[0];
+    if (col + 1 < K) v.y = p[1];
+    if (col + 2 < K) v.z = p[2];
+    return v;
+}
+__global__ void matmul_tiled_2D_coarse_vec(int M, int K, int N,
+                                           const float * __restrict__ A,
+                                           const float * __restrict__ B,
+                                           float       * __restrict__ C)
+{
+    const uint threadRow = threadIdx.x / (BN / TN);   
+    const uint threadCol = threadIdx.x % (BN / TN);   
 
-    
-    uint innerRowA = threadIdx.x / (BK/4);    
-    uint innerColA = threadIdx.x % (BK/4);    
-    uint innerRowB = threadIdx.x / (BN/4);    
-    uint innerColB = threadIdx.x % (BN/4);    
+    const uint innerRowA = threadIdx.x / (BK / 4);   
+    const uint innerColA = threadIdx.x % (BK / 4);   
+    const uint innerRowB = threadIdx.x / (BN / 4);   
+    const uint innerColB = threadIdx.x % (BN / 4);   
 
-    
-    __shared__ float sh_AT[BK*BM];   
-    __shared__ float sh_B [BK*BN];   
+    __shared__ float sh_AT[BK * BM];   
+    __shared__ float sh_B [BK * BN];   
 
-    float threadResults[TM * TN] = {0.f};
-    float regM[TM] = {0.f};
-    float regN[TN] = {0.f};
 
-    for (int phase = 0; phase < N/BK; phase++)
+    float threadResults[TM * TN] = {};
+    float regM[TM] = {};
+    float regN[TN] = {};
+
+    constexpr int stride_A = BLOCK_SIZE_2D / (BK / 4);   
+    constexpr int stride_B = BLOCK_SIZE_2D / (BN / 4);
+
+    const int phases = (K + BK - 1) / BK;
+
+    for (int phase = 0; phase < phases; ++phase)
     {
-     
-        for (int offset = 0; offset < BM; offset += 64/(BK/4)) {
-            float4 tmp = reinterpret_cast<float4*>(
-                &A[(blockIdx.x*BM + innerRowA + offset)*N
-                   + phase*BK + innerColA*4])[0];
-            sh_AT[(innerColA*4 + 0)*BM+innerRowA + offset] = tmp.x;
-            sh_AT[(innerColA*4 + 1)*BM+innerRowA + offset] = tmp.y;
-            sh_AT[(innerColA*4 + 2)*BM+innerRowA + offset] = tmp.z;
-            sh_AT[(innerColA*4 + 3)*BM+innerRowA + offset] = tmp.w;
+        for (int offset = 0; offset < BM; offset += stride_A)
+        {
+            const int gRow = blockIdx.x * BM + innerRowA + offset;
+            const int gCol = phase * BK  + innerColA * 4;
+            float4 tmp     = safe_ldA(A, gRow, gCol, M, K);
+
+            sh_AT[(innerColA * 4 + 0) * BM + innerRowA + offset] = tmp.x;
+            sh_AT[(innerColA * 4 + 1) * BM + innerRowA + offset] = tmp.y;
+            sh_AT[(innerColA * 4 + 2) * BM + innerRowA + offset] = tmp.z;
+            sh_AT[(innerColA * 4 + 3) * BM + innerRowA + offset] = tmp.w;
         }
 
-        for (int offset = 0; offset < BK; offset += 64/(BN/4)) {
-            reinterpret_cast<float4*>(
-                &sh_B[(innerRowB + offset)*BK+innerColB*4])[0] =
-            reinterpret_cast<float4*>(
-                &B[(phase*BK + innerRowB + offset)*N
-                   + blockIdx.y*BN + innerColB*4])[0];
+        for (int offset = 0; offset < BK; offset += stride_B)
+        {
+            const int gRow = phase * BK       + innerRowB + offset;
+            const int gCol = blockIdx.y * BN  + innerColB * 4;
+            reinterpret_cast<float4 *>(
+                &sh_B[(innerRowB + offset) * BN + innerColB * 4])[0]
+                    = safe_ldB(B, gRow, gCol, K, N);
         }
         __syncthreads();
 
-        for (int dotIdx = 0; dotIdx < BK; dotIdx++)
+        for (int dotIdx = 0; dotIdx < BK; ++dotIdx)
         {
-            reinterpret_cast<float4*>(regM    )[0] =
-                reinterpret_cast<float4*>(&sh_AT[dotIdx*BK+threadRow*TM    ])[0];
-            reinterpret_cast<float4*>(regM + 4)[0] =
-                reinterpret_cast<float4*>(&sh_AT[dotIdx*BK+threadRow*TM + 4])[0];
+            reinterpret_cast<float4 *>(regM    )[0] =
+                reinterpret_cast<float4 *>(&sh_AT[dotIdx * BM + threadRow * TM    ])[0];
+            reinterpret_cast<float4 *>(regM + 4)[0] =
+                reinterpret_cast<float4 *>(&sh_AT[dotIdx * BM + threadRow * TM + 4])[0];
 
-            reinterpret_cast<float4*>(regN    )[0] =
-                reinterpret_cast<float4*>(&sh_B[dotIdx*BK+threadCol*TN    ])[0];
 
-            for (int m = 0; m < TM; m++)
-                for (int n = 0; n < TN; n++)
-                    threadResults[m*TN + n] += regM[m] * regN[n];
+            reinterpret_cast<float4 *>(regN)[0] =
+                reinterpret_cast<float4 *>(&sh_B[dotIdx * BN + threadCol * TN])[0];
+
+            for (int m = 0; m < TM; ++m)
+                for (int n = 0; n < TN; ++n)
+                    threadResults[m * TN + n] += regM[m] * regN[n];
         }
         __syncthreads();
     }
 
-    for (int m = 0; m < TM; m++)
-        for (int n = 0; n < TN; n++)
-            C[(blockIdx.x*BM + threadRow*TM + m)*N
-              + blockIdx.y*BN + threadCol*TN + n] = threadResults[m*TN + n];
-}
 
+    for (int m = 0; m < TM; ++m)
+    {
+        const int gRow = blockIdx.x * BM + threadRow * TM + m;
+        if (gRow >= M) continue;          
+        for (int n = 0; n < TN; ++n)
+        {
+            const int gCol = blockIdx.y * BN + threadCol * TN + n;
+            if (gCol >= N) continue;      
+            C[(size_t)gRow * N + gCol] = threadResults[m * TN + n];
+        }
+    }
+}
 
 float elapsed_ms(cudaEvent_t start, cudaEvent_t stop)
 {
@@ -219,7 +263,7 @@ int main()
 
         dim3 grid_t1((N / BN), (N / BM));
         cudaEventRecord(start);
-        matmul_tiled_2D_coarse_vec<<<grid_t1, (BN/TN) *(BM / TM)>>>(N, d_A, d_B, d_C);
+        matmul_tiled_2D_coarse_vec<<<grid_t1, (BN/TN) *(BM / TM)>>>(N, N, N, d_A, d_B, d_C);
         cudaEventRecord(stop);
         cudaEventSynchronize(stop);
         float ms_2D;
