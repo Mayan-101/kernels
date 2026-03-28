@@ -25,7 +25,7 @@
 #    8. (BK*BM + BK*BN)*4 ≤ 49152 bytes    (fits in 48 KB smem)
 # ─────────────────────────────────────────────────────────────────────────────
 
-SOURCE="kernel.cu"
+SOURCE="finetune_kernel.cu"
 EXE="/tmp/matmul_tune_$$"
 N=2048
 TIMEOUT_SEC=15
