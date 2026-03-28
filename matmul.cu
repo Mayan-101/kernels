@@ -243,6 +243,25 @@ int main()
         cudaMemcpy(d_A, h_A, bytes, cudaMemcpyHostToDevice);
         cudaMemcpy(d_B, h_B, bytes, cudaMemcpyHostToDevice);
 
+        //Warm-up for cuBLAS
+        float alpha = 1.f, beta = 0.f;
+        cudaEventRecord(start);
+        cublasSgemm(handle,
+                    CUBLAS_OP_N, CUBLAS_OP_N,
+                    N, N, N,
+                    &alpha,
+                    d_B, N, 
+                    d_A, N,
+                    &beta,
+                    d_C, N);
+        cudaDeviceSynchronize();
+        //Warm-up for CUDA
+        dim3 block2dw(BLOCK_SIZE, BLOCK_SIZE);
+        dim3 grid2dw((N + BLOCK_SIZE - 1) / BLOCK_SIZE, (N + BLOCK_SIZE - 1) / BLOCK_SIZE);
+        matmul<<<grid2dw, block2dw>>>(N, N, N, d_A, d_B, d_C);
+        cudaDeviceSynchronize();
+
+
         dim3 block2d(BLOCK_SIZE, BLOCK_SIZE);
         dim3 grid2d((N + BLOCK_SIZE - 1) / BLOCK_SIZE, (N + BLOCK_SIZE - 1) / BLOCK_SIZE);
         cudaEventRecord(start);
@@ -287,7 +306,6 @@ int main()
         cudaMemcpy(h_C, d_C, bytes, cudaMemcpyDeviceToHost);
         cudaDeviceSynchronize();
 
-        float alpha = 1.f, beta = 0.f;
         cudaEventRecord(start);
         cublasSgemm(handle,
                     CUBLAS_OP_N, CUBLAS_OP_N,
