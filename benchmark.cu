@@ -4,7 +4,7 @@
 #include <math.h>
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
-#include "kernels/kernel_5.cuh"
+#include "kernels/kernel_6.cuh"
 
 
 //  Macros
@@ -40,11 +40,12 @@ static const float REL_TOL       = 1e-3f;   // max relative error vs cuBLAS
 static const float ABS_TOL       = 1e-5f;   // abs floor to avoid div-by-zero
 
 // Tile sizes — must match the template parameters you call the kernel with
-static const int BM = 64;
-static const int BN = 64;
-static const int BK = 64;
+static const int BM = 128;
+static const int BN = 128;
+static const int BK = 16;
 static const int TM = 8;
 static const int TN = 8;
+static const int extra_cols = 4;
 
 
 //  Helpers
@@ -188,7 +189,7 @@ static void run_benchmark(cublasHandle_t handle, int M, int K, int N,
         // Moved cudaMemcpy outside the warmup loop
         CUDA_CHECK(cudaMemcpy(dC_ker, hC, szC * sizeof(float), cudaMemcpyHostToDevice));
         for (int r = 0; r < WARMUP_RUNS; r++) {
-            matmul_tiled<BK, BM, BN, TM, TN><<<grid, block>>>(
+            matmul_tiled<BK, BM, BN, TM, TN, extra_cols><<<grid, block>>>(
                 M, K, N, alpha, dA, dB, beta, dC_ker);
         }
         CUDA_CHECK(cudaDeviceSynchronize());
@@ -198,7 +199,7 @@ static void run_benchmark(cublasHandle_t handle, int M, int K, int N,
 
         CUDA_CHECK(cudaEventRecord(ev_start));
         for (int r = 0; r < BENCH_RUNS; r++) {
-            matmul_tiled<BK, BM, BN, TM, TN><<<grid, block>>>(
+            matmul_tiled<BK, BM, BN, TM, TN, extra_cols><<<grid, block>>>(
                 M, K, N, alpha, dA, dB, beta, dC_ker);
         }
         CUDA_CHECK(cudaEventRecord(ev_stop));
