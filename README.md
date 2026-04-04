@@ -32,7 +32,7 @@ N=2048  naive:   248.7ms  coal:   262.1ms     tiled:   100.3ms   tiled_1d:   122
 N=4096  naive:  2186.2ms  coal:  2144.5ms     tiled:   888.7ms   tiled_1d:  1075.5ms  tiled_2d_vec:   214.5ms  tiled_2d_vec_pad:   223.1ms      cuBLAS:   145.8ms
 ```
 
-### Softmax (`softmax_bench.cu`, `softmax_playground.cu`)
+### Softmax (`softmax_bench.cu`, `softmax_playground.cuh`)
 
 | Kernel | Strategy |
 |---|---|
