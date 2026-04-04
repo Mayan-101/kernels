@@ -94,7 +94,7 @@ static bool check_correctness(const float *ref, const float *out,
 }
 
 
-//  Benchmark one (M, K, N) problem size
+
 
 
 static void run_benchmark(cublasHandle_t handle, int M, int K, int N,
@@ -105,7 +105,7 @@ static void run_benchmark(cublasHandle_t handle, int M, int K, int N,
     const size_t szA = (size_t)M * K;
     const size_t szB = (size_t)K * N;
     const size_t szC = (size_t)M * N;
-    const double flops = 2.0 * M * K * N;   // multiply-add pairs
+    const double flops = 2.0 * M * K * N;   
 
     // host buffers 
     float *hA = (float *)malloc(szA * sizeof(float));
@@ -262,7 +262,7 @@ int main(void)
     const float alpha = 1.0f, beta = 0.0f;
 
     for (size_t i = 0; i < sizeof(sizes) / sizeof(sizes[0]); i++)
-        run_benchmark(handle, sizes[i][0], sizes[i][0], sizes[i][0], alpha, beta);
+        run_benchmark(handle, sizes[i][0], sizes[i][1], sizes[i][0], alpha, beta);
 
     CUBLAS_CHECK(cublasDestroy(handle));
     printf("\nDone.\n");
