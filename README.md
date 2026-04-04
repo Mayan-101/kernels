@@ -12,14 +12,14 @@ Hand-written CUDA kernels for matrix multiplication, softmax, and attention — 
 
 Four progressively optimized kernels, benchmarked head-to-head against cuBLAS:
 
-| Kernel | Strategy |
+| Kernel |Description(Pseudo_name)| Strategy |
 |---|---|---|
-|mysgemm1| `matmul` | Naive 2D thread per output element |
-|mysgemm2| `matmul_1D` | Coalesced 1D thread indexing |
-|mysgemm3| `matmul_tiled` | Shared memory tiling |
-|mysgemm4| `matmul_tiled_1D_coarse` | 1D tiling + thread coarsening (TM output rows per thread) |
-|mysgemm5| `matmul_tiled_2D_coarse_vec` | 2D tiling + register blocking (TM×TN) + `float4` vectorized loads, transposed A in SMEM |
-|mysgemm6| `matmul_tiled_2D_coarse_vec_with_extra_cols` | 2D tiling + register blocking (TM×TN) + `float4` vectorized loads, transposed A in SMEM  with padding (avoiding bankconflicts)|
+|mysgemm1| `naive` | Naive 2D thread per output element |
+|mysgemm2| `coal` | Coalesced 1D thread indexing |
+|mysgemm3| `tiled` | Shared memory tiling |
+|mysgemm4| `tiled_1D` | 1D tiling + thread coarsening (TM output rows per thread) |
+|mysgemm5| `tiled_2D_vec` | 2D tiling + register blocking (TM×TN) + `float4` vectorized loads, transposed A in SMEM |
+|mysgemm6| `tiled_2D_vec_pad` | 2D tiling + register blocking (TM×TN) + `float4` vectorized loads, transposed A in SMEM  with padding (avoiding bankconflicts)|
 
 ### Matrix Multiplication (square, N×N)
 
