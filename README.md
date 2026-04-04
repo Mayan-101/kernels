@@ -69,8 +69,6 @@ Kernels implemented from scratch:
 
 ---
 
-## Benchmarks
-
 
 
 
