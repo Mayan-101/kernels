@@ -1,12 +1,7 @@
-#pragma once
-
-#include <cuda_runtime.h>
-#include <cublas_v2.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include "utils.cuh"
 
 template <const uint BK, const uint BM, const uint BN, const uint TM, const uint TN>
-__global__ void matmul_tiled(int M, int K, int N, float alpha, float *A, float *B, float beta, float *C)
+__global__ void mysgemm4(int M, int K, int N, float alpha, float *A, float *B, float beta, float *C)
 {
     const uint thread_pool = (BM / TM) * (BN / TN);
 

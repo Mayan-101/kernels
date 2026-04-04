@@ -1,12 +1,7 @@
-#pragma once
-
-#include <cuda_runtime.h>
-#include <cublas_v2.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include "utils.cuh"
 
 template<const int BK>
-__global__ void matmul_1D(int M, int K, int N, float alpha, float *A, float *B, float beta, float *C)
+__global__ void mysgemm2(int M, int K, int N, float alpha, float *A, float *B, float beta, float *C)
 {
     uint const x = threadIdx.x / BK+ BK* blockIdx.y;
     uint const y = threadIdx.x % BK+ BK* blockIdx.x;

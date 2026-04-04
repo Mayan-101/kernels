@@ -1,41 +1,6 @@
-#pragma once
-
-#include <algorithm>
-#include <cassert>
-#include <cstdio>
-#include <cstdlib>
-#include <cublas_v2.h>
-#include <cuda_runtime.h>
-
-
-static __device__ __forceinline__
-float4 safe_ldB(const float * __restrict__ B,
-                int row, int col, int K, int N)
-{
-    float4 v = {0.f, 0.f, 0.f, 0.f};
-    if (row >= K) return v;
-    const float *p = B + (size_t)row * N + col;
-    if (col + 3 < N) return reinterpret_cast<const float4 *>(p)[0];
-    if (col     < N) v.x = p[0];
-    if (col + 1 < N) v.y = p[1];
-    if (col + 2 < N) v.z = p[2];
-    return v;
-}
-static __device__ __forceinline__
-float4 safe_ldA(const float * __restrict__ A,
-                int row, int col, int M, int K)
-{
-    float4 v = {0.f, 0.f, 0.f, 0.f};
-    if (row >= M) return v;
-    const float *p = A + (size_t)row * K + col;
-    if (col + 3 < K) return reinterpret_cast<const float4 *>(p)[0];
-    if (col     < K) v.x = p[0];
-    if (col + 1 < K) v.y = p[1];
-    if (col + 2 < K) v.z = p[2];
-    return v;
-}
+#include "utils.cuh"
 template <const uint BK, const uint BM, const uint BN, const uint TM, const uint TN>
-__global__ void matmul_tiled(int M, int K, int N, float alpha, float *A, float *B, float beta, float *C)
+__global__ void mysgemm5(int M, int K, int N, float alpha, float *A, float *B, float beta, float *C)
 {
     const uint threadRow = threadIdx.x / (BN / TN);
     const uint threadCol = threadIdx.x % (BN / TN);

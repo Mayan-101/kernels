@@ -1,11 +1,6 @@
-#pragma once
+#include "utils.cuh"
 
-#include <cuda_runtime.h>
-#include <cublas_v2.h>
-#include <stdio.h>
-#include <stdlib.h>
-
-__global__ void matmul(int M, int K, int N, float alpha, float *A, float *B, float beta, float *C)
+__global__ void mysgemm1(int M, int K, int N, float alpha, float *A, float *B, float beta, float *C)
 {
     int row = threadIdx.y + blockDim.y * blockIdx.y;
     int column = threadIdx.x + blockDim.x * blockIdx.x;

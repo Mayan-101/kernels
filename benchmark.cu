@@ -39,7 +39,7 @@ static const int   BENCH_RUNS    = 10;
 static const float REL_TOL       = 1e-3f;   // max relative error vs cuBLAS
 static const float ABS_TOL       = 1e-5f;   // abs floor to avoid div-by-zero
 
-// Tile sizes — must match the template parameters you call the kernel with
+// Tile sizes 
 static const int BM = 128;
 static const int BN = 128;
 static const int BK = 16;
@@ -189,7 +189,7 @@ static void run_benchmark(cublasHandle_t handle, int M, int K, int N,
         // Moved cudaMemcpy outside the warmup loop
         CUDA_CHECK(cudaMemcpy(dC_ker, hC, szC * sizeof(float), cudaMemcpyHostToDevice));
         for (int r = 0; r < WARMUP_RUNS; r++) {
-            matmul_tiled<BK, BM, BN, TM, TN, extra_cols><<<grid, block>>>(
+             mysgemm6<BK, BM, BN, TM, TN, extra_cols><<<grid, block>>>(
                 M, K, N, alpha, dA, dB, beta, dC_ker);
         }
         CUDA_CHECK(cudaDeviceSynchronize());
@@ -199,7 +199,7 @@ static void run_benchmark(cublasHandle_t handle, int M, int K, int N,
 
         CUDA_CHECK(cudaEventRecord(ev_start));
         for (int r = 0; r < BENCH_RUNS; r++) {
-            matmul_tiled<BK, BM, BN, TM, TN, extra_cols><<<grid, block>>>(
+             mysgemm6<BK, BM, BN, TM, TN, extra_cols><<<grid, block>>>(
                 M, K, N, alpha, dA, dB, beta, dC_ker);
         }
         CUDA_CHECK(cudaEventRecord(ev_stop));
@@ -209,7 +209,7 @@ static void run_benchmark(cublasHandle_t handle, int M, int K, int N,
         float ms_avg   = ms_total / BENCH_RUNS;
         double tflops  = flops / (ms_avg * 1e-3) / 1e12;
 
-        printf("  [matmul_tiled]     avg = %8.3f ms   %6.2f TFLOPS\n",
+        printf("  [ mysgemm6]     avg = %8.3f ms   %6.2f TFLOPS\n",
                ms_avg, tflops);
 
         CUDA_CHECK(cudaMemcpy(hC_out, dC_ker, szC * sizeof(float),

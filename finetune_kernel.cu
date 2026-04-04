@@ -35,7 +35,7 @@
 
 
 
-// ─── Verification Logic ─────────────────────────────────────────────
+// ─── Verification Logic 
 bool verify_results(const float *C_custom, const float *C_reference, int size)
 {
     const float epsilon = 1e-4;
@@ -57,7 +57,7 @@ bool verify_results(const float *C_custom, const float *C_reference, int size)
     return true;
 }
 
-// ─── Harness & Timing Logic ─────────────────────────────────────────
+
 int main(int argc, char **argv)
 {
     int N = 2048;
@@ -99,7 +99,7 @@ int main(int argc, char **argv)
     dim3 block((BM / TM) * (BN / TN));
 
     // 1. Warm-up and Catch Launch Errors (Custom Kernel)
-    matmul_tiled<BK, BM, BN, TM, TN, EXTRA_COLS><<<grid, block>>>(N, N, N, 1.0f, d_A, d_B,0.0f,  d_C);
+     mysgemm6<BK, BM, BN, TM, TN, EXTRA_COLS><<<grid, block>>>(N, N, N, 1.0f, d_A, d_B,0.0f,  d_C);
 
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess)
@@ -153,7 +153,7 @@ int main(int argc, char **argv)
     cudaEventCreate(&stop);
 
     cudaEventRecord(start);
-    matmul_tiled<BK, BM, BN, TM, TN, EXTRA_COLS><<<grid, block>>>(N, N, N, 1.0f, d_A, d_B,0.0f,  d_C);
+     mysgemm6<BK, BM, BN, TM, TN, EXTRA_COLS><<<grid, block>>>(N, N, N, 1.0f, d_A, d_B,0.0f,  d_C);
     cudaEventRecord(stop);
 
     cudaEventSynchronize(stop);
