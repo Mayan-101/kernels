@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <cuda_runtime.h>
 #include <math.h>               
-#define BK 96
+#define BK 32
 #define CUDA_CHECK(call)                                                        \
     do {                                                                        \
         cudaError_t err = (call);                                               \
