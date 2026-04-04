@@ -1,20 +1,8 @@
-# CUDA Kernels from Scratch And Matching cuBLAS performance on SGeMM kernels
+# CUDA Kernels from Scratch includes SGeMM Kernels , Softmaxx kernels and a naive MNIST NN implementation
 
 Hand-written CUDA kernels for matrix multiplication, softmax, and attention — built progressively from naive implementations to highly optimized tiled/vectorized variants, with an auto-tuner and a full MNIST neural network.
 
----
 
-## Project Structure
-
-```
-.
-├── matmul_bench.cu        # Benchmark suite: naive → tiled → 2D coarse vectorized vs cuBLAS
-├── softmax_bench.cu       # Benchmark suite: naive vs online shared-memory softmax
-├── softmax_playground.cu  # Softmax kernel experiments
-├── finetune_kernel.cu     # Kernel compiled by the auto-tuner
-├── nn.cu                  # Full 3-layer MLP trained on MNIST end-to-end in CUDA
-└── tune.sh                # Auto-tuner: sweeps tiling parameters and reports best config
-```
 
 ---
 
@@ -37,15 +25,7 @@ The final kernel (`tiled_2D_coarse_vec`) stores A transposed in shared memory to
 
 > Tested on NVIDIA GeForce MX330 (Pascal Architecture) GPU. All times in ms, bandwidth in GB/s.
 
-```
-N= 256  naive:  0.5ms( 0.1GB/s)  coal:  0.5ms( 1.4GB/s)  tiled:  0.3ms( 3.0GB/s)  tiled_1d:  0.1ms( 5.6GB/s)  tiled_2d_vec:  0.1ms( 6.6GB/s)  cuBLAS: 15.7ms( 0.1GB/s)
-N= 512  naive:  4.1ms( 0.8GB/s)  coal:  4.0ms( 0.8GB/s)  tiled:  1.8ms( 1.8GB/s)  tiled_1d:  0.7ms( 4.3GB/s)  tiled_2d_vec:  0.4ms( 8.0GB/s)  cuBLAS:  4.2ms( 0.7GB/s)
-N=1024  naive: 32.4ms( 0.4GB/s)  coal: 32.2ms( 0.4GB/s)  tiled: 13.8ms( 0.9GB/s)  tiled_1d:  5.7ms( 2.2GB/s)  tiled_2d_vec:  2.4ms( 5.3GB/s)  cuBLAS:  2.4ms( 5.2GB/s)
-N=2048  naive:245.6ms( 0.2GB/s)  coal:249.6ms( 0.2GB/s)  tiled:102.3ms( 0.5GB/s)  tiled_1d: 41.7ms( 1.2GB/s)  tiled_2d_vec: 17.0ms( 3.0GB/s)  cuBLAS: 16.5ms( 3.0GB/s)
-N=4096  naive:2032ms( 0.1GB/s)   coal:2039ms( 0.1GB/s)   tiled:796.5ms( 0.3GB/s)  tiled_1d:320.6ms( 0.6GB/s)  tiled_2d_vec:135.5ms( 1.5GB/s)  cuBLAS:134.2ms( 1.5GB/s)
-```
 
-**`tiled_2d_vec` matches cuBLAS at N=2048 and N=4096** (~3.0 GB/s vs 3.0 GB/s).
 ### Softmax (`softmax_bench.cu`, `softmax_playground.cu`)
 
 | Kernel | Strategy |
