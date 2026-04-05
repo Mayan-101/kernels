@@ -1,6 +1,6 @@
 # CUDA Kernels from Scratch includes SGeMM Kernels , Softmax kernels and a naive MNIST NN implementation
 
-Hand-written CUDA kernels for matrix multiplication, softmax, and attention — built progressively from naive implementations to highly optimized tiled/vectorized variants, with an auto-tuner and a full MNIST neural network.
+Hand-written CUDA kernels for matrix multiplication and softmax— built progressively from naive implementations to highly optimized tiled/vectorized variants, with an auto-tuner and a full MNIST neural network.
 
 
 
@@ -10,7 +10,7 @@ Hand-written CUDA kernels for matrix multiplication, softmax, and attention — 
 
 ### Matrix Multiplication (`progress.cu`)
 
-Four progressively optimized kernels, benchmarked head-to-head against cuBLAS:
+Progressively optimized kernels, benchmarked head-to-head against cuBLAS:
 
 | Kernel |Description(Pseudo_name)| Strategy |
 |---|---|---|
