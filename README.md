@@ -1,4 +1,4 @@
-# CUDA Kernels from Scratch includes SGeMM Kernels , Softmax kernels and a naive MNIST NN implementation
+# CUDA Kernels from Scratch includes GeMM Kernels, (SGeMM in Future) , Softmax kernels and a naive MNIST NN implementation
 
 Hand-written CUDA kernels for matrix multiplication and softmax— built progressively from naive implementations to highly optimized tiled/vectorized variants, with an auto-tuner and a full MNIST neural network.
 
